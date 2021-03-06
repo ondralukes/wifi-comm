@@ -2,75 +2,48 @@
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include "DeviceManager.h"
-#include "global.h"
+#include "WiFiManager.h"
+#include "MessageBuilder.h"
 
-const char* ssid = "_node_comm";
-const char* password = "supersecret123";
-
-bool isAP = false;
 DeviceManager deviceManager;
 void setup() {
     WiFi.mode(WIFI_OFF);
     Serial.begin(9600);
     pinMode(LED_BUILTIN, OUTPUT);
+    Serial.println();
+    Serial.print("[System] wifi-comm@");
+    Serial.println(REVISION);
 }
 
-void connect(){
-    digitalWrite(LED_BUILTIN, HIGH);
-    Serial.println("Scanning networks...");
-    int8_t n = WiFi.scanNetworks(false, false, 0, (uint8 *) ssid);
-    bool available = false;
-    for(int i = 0;i<n;i++){
-        auto scannedSSID = WiFi.SSID(i);
-        Serial.println(scannedSSID);
-        if(scannedSSID == ssid){
-            available = true;
-        }
-    }
-    if(available) {
-        Serial.println("Connecting.");
-        WiFi.begin(ssid, password);
-        unsigned long start = millis();
-        while (millis() - start < 30000) {
-            if (WiFi.status() == WL_CONNECTED) {
-                isAP = false;
-                Serial.println("Connected.");
-                return;
-            }
-            delay(100);
-            Serial.print(".");
-        }
-    } else {
-        Serial.println("Network not found.");
-    }
-    Serial.println("Could not connect to network. Creating Access Point.");
-    if(!WiFi.softAPConfig(
-            IPAddress(192,168,1,1),
-            IPAddress(192,168,1,1),
-            IPAddress(255,255,255,0)
-    )){
-        throw_error("Failed to configure AP.");
-    }
-    if(!WiFi.softAP(ssid, password)){
-        throw_error("Failed to start AP.");
-    }
-    isAP = true;
-    Serial.println("Access Point created.");
-}
 
 void handle_ui(){
+    static bool message = false;
     if(Serial.available() == 0) return;
     while (Serial.available() > 0) {
         char c = Serial.read();
+        if(c == '`'){
+            if(message){
+                MessageBuilder::SendMessage(deviceManager);
+                message = false;
+            } else {
+                MessageBuilder::BeginMessage();
+                message = true;
+            }
+            continue;
+        }
+        if(message){
+            MessageBuilder::Write(c);
+            continue;
+        }
         if(c == 'r'){
-            Serial.println("Reset");
+            Serial.println("[System] Reset.");
             ESP.reset();
         }
     }
 }
 
 void status_led(){
-    if(!isAP){
+    if(WiFiManager::Status() == Station){
         digitalWrite(LED_BUILTIN, LOW);
         return;
     }
@@ -84,10 +57,7 @@ void status_led(){
 }
 
 void loop() {
-    if(WiFi.status() != WL_CONNECTED && !isAP){
-        Serial.println("No connection.");
-        connect();
-    }
+    WiFiManager::CheckConnection();
     handle_ui();
     deviceManager.Update();
     status_led();

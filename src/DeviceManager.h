@@ -1,10 +1,12 @@
-#ifndef DEVICEMANAGER_H
-#define DEVICEMANAGER_H
+#ifndef WIFI_COMM_DEVICEMANAGER_H
+#define WIFI_COMM_DEVICEMANAGER_H
 #include <IPAddress.h>
 #include <WiFiUdp.h>
 
+struct Message;
 struct Device{
     explicit Device(const IPAddress& ip);
+    Message* messageToAck = nullptr;
     IPAddress address;
     unsigned long lastSeen;
 };
@@ -33,16 +35,16 @@ public:
     DeviceManager();
     void Update();
     DeviceIterator Iterator();
-
+    void SendToAll(Message* msg);
 private:
     WiFiUDP udp;
     unsigned long lastAnnounce = 0;
     DeviceListNode* list = nullptr;
 
     void Announce();
-    void Scan();
+    void HandleIncoming();
     void RemoveOld();
 };
 
 
-#endif //UNTITLED1_DEVICEMANAGER_H
+#endif //WIFI_COMM_DEVICEMANAGER_H
