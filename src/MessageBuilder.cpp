@@ -4,7 +4,6 @@
 char MessageBuilder::buffer[4096];
 int MessageBuilder::len;
 void MessageBuilder::BeginMessage() {
-    Serial.println("[Message Builder] Begin message.");
     len = 0;
 }
 

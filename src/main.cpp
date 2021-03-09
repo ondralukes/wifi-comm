@@ -4,13 +4,22 @@
 #include "DeviceManager.h"
 #include "WiFiManager.h"
 #include "MessageBuilder.h"
+#include "Keyboard.h"
 
+#ifndef REVISION
+    #define REVISION "unknown"
+#endif
 DeviceManager deviceManager;
+const uint8_t rowPins [4] = {D1, D2, D3, D5};
+const uint8_t colsPins [4] = {D4, D6, D7, D8};
+Keyboard keyboard(rowPins, 4, colsPins, 4);
 void setup() {
     WiFi.mode(WIFI_OFF);
     Serial.begin(9600);
     pinMode(LED_BUILTIN, OUTPUT);
+
     Serial.println();
+    Serial.println(ESP.getResetReason());
     Serial.print("[System] wifi-comm@");
     Serial.println(REVISION);
 }
@@ -57,6 +66,28 @@ void status_led(){
 }
 
 void loop() {
+    static bool inMessage = false;
+    int pk = keyboard.Peek();
+    if(pk != -1){
+        Serial.printf("%c\x1b[D", pk);
+    }
+    int rd = keyboard.Read();
+    if(rd != -1){
+        if(rd == '#'){
+            Serial.println();
+            if(inMessage) {
+                MessageBuilder::SendMessage(deviceManager);
+                inMessage = false;
+            }
+        } else {
+            Serial.print((char)rd);
+            if(!inMessage) {
+                MessageBuilder::BeginMessage();
+                inMessage = true;
+            }
+            MessageBuilder::Write(rd);
+        }
+    }
     WiFiManager::CheckConnection();
     handle_ui();
     deviceManager.Update();
