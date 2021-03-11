@@ -5,51 +5,23 @@
 #include "WiFiManager.h"
 #include "MessageBuilder.h"
 #include "Keyboard.h"
+#include "Display.h"
 
-#ifndef REVISION
-    #define REVISION "unknown"
-#endif
-DeviceManager deviceManager;
-const uint8_t rowPins [4] = {D1, D2, D3, D5};
+Display lcd;
+DeviceManager deviceManager(lcd);
+
+const uint8_t rowPins [4] = {10, D9, D3, D5};
 const uint8_t colsPins [4] = {D4, D6, D7, D8};
 Keyboard keyboard(rowPins, 4, colsPins, 4);
 void setup() {
+    // Convert RX to GPIO
+    pinMode(D9, FUNCTION_3);
     WiFi.mode(WIFI_OFF);
-    Serial.begin(9600);
     pinMode(LED_BUILTIN, OUTPUT);
 
-    Serial.println();
-    Serial.println(ESP.getResetReason());
-    Serial.print("[System] wifi-comm@");
-    Serial.println(REVISION);
+    lcd.WriteRolling("test");
 }
 
-
-void handle_ui(){
-    static bool message = false;
-    if(Serial.available() == 0) return;
-    while (Serial.available() > 0) {
-        char c = Serial.read();
-        if(c == '`'){
-            if(message){
-                MessageBuilder::SendMessage(deviceManager);
-                message = false;
-            } else {
-                MessageBuilder::BeginMessage();
-                message = true;
-            }
-            continue;
-        }
-        if(message){
-            MessageBuilder::Write(c);
-            continue;
-        }
-        if(c == 'r'){
-            Serial.println("[System] Reset.");
-            ESP.reset();
-        }
-    }
-}
 
 void status_led(){
     if(WiFiManager::Status() == Station){
@@ -69,18 +41,18 @@ void loop() {
     static bool inMessage = false;
     int pk = keyboard.Peek();
     if(pk != -1){
-        Serial.printf("%c\x1b[D", pk);
+        lcd.ReplaceBottom(pk);
     }
     int rd = keyboard.Read();
     if(rd != -1){
         if(rd == '#'){
-            Serial.println();
             if(inMessage) {
                 MessageBuilder::SendMessage(deviceManager);
+                lcd.ClearBottom();
                 inMessage = false;
             }
         } else {
-            Serial.print((char)rd);
+            lcd.WriteBottom(rd);
             if(!inMessage) {
                 MessageBuilder::BeginMessage();
                 inMessage = true;
@@ -88,8 +60,8 @@ void loop() {
             MessageBuilder::Write(rd);
         }
     }
-    WiFiManager::CheckConnection();
-    handle_ui();
+    WiFiManager::CheckConnection(lcd);
+    lcd.Update();
     deviceManager.Update();
     status_led();
 }

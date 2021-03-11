@@ -2,6 +2,7 @@
 #define WIFI_COMM_DEVICEMANAGER_H
 #include <IPAddress.h>
 #include <WiFiUdp.h>
+#include "Display.h"
 
 struct Message;
 struct Device{
@@ -32,12 +33,13 @@ private:
 };
 class DeviceManager {
 public:
-    DeviceManager();
+    DeviceManager(Display &display);
     void Update();
     DeviceIterator Iterator();
     void SendToAll(Message* msg);
 private:
     WiFiUDP udp;
+    Display&display;
     unsigned long lastAnnounce = 0;
     DeviceListNode* list = nullptr;
 

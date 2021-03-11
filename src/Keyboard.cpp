@@ -34,7 +34,6 @@ void Keyboard::Queue<T, S>::Enqueue(T item) {
 }
 
 Keyboard::Keyboard(const uint8_t *rowPins, int rows, const uint8_t* colPins, int cols){
-    Serial.println(sizeof(Hit));
     isrData = new ISRAccessedData();
     isrData->rPins = new uint8_t[rows];
     memcpy(isrData->rPins, rowPins, rows * sizeof(uint8_t));

@@ -1,4 +1,3 @@
-#include <HardwareSerial.h>
 #include "MessageBuilder.h"
 
 char MessageBuilder::buffer[4096];
@@ -16,8 +15,5 @@ void MessageBuilder::SendMessage(DeviceManager &deviceManager) {
     msg->len = len;
     msg->remainingAcks = 0;
     memcpy(msg->message, buffer, len);
-    Serial.print("[Message Builder] Sending ");
-    Serial.print(len);
-    Serial.println(" bytes.");
     deviceManager.SendToAll(msg);
 }

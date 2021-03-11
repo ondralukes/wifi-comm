@@ -35,7 +35,7 @@ DeviceIterator DeviceManager::Iterator() {
     return DeviceIterator(&list);
 }
 
-DeviceManager::DeviceManager() {
+DeviceManager::DeviceManager(Display &display) : display(display){
     udp.begin(9887);
 }
 
@@ -50,10 +50,10 @@ void DeviceManager::Announce() {
     lastAnnounce = millis();
     const static IPAddress broadcast(192,168,1,255);
     if(!udp.beginPacket(broadcast, 9887))
-        Serial.println("[Device Manager] Warning: Failed to begin announcement UDP packet.");
+        display.WriteRolling("!UDP_ANN_BEGIN_ERR");
     udp.write('a');
     if(!udp.endPacket())
-        Serial.println("[Device Manager] Warning: Failed to end announcement UDP packet.");
+        display.WriteRolling("!UDP_ANN_END_ERR");
 }
 
 void DeviceManager::HandleIncoming() {
@@ -73,35 +73,34 @@ void DeviceManager::HandleIncoming() {
             it.Next();
         }
         if(it.Ended()) {
-            Serial.print("[Device Manager] Found new device ");
-            Serial.print(ip);
-            Serial.println(" .");
+            display.WriteRollingInt(ip[3]);
+            display.WriteRolling("[+]");
             it.Insert(Device(ip));
             d = &it.Current();
         }
         if(size == 0) continue;
         if(buffer[0] == PACKET_MSG){
-            Serial.print(ip);
-            Serial.print(">");
+            display.WriteRollingInt(ip[3]);
+            display.WriteRolling(">");
             buffer[size] = '\0';
-            Serial.println(&buffer[1]);
+            display.WriteRolling(&buffer[1]);
             udp.beginPacket(ip, 9887);
             udp.write(PACKET_ACK);
             udp.endPacket();
         } else if(buffer[0] == PACKET_ACK){
             if(d->messageToAck == nullptr){
-                Serial.println("[Device Manager] Warning: Unexpected ACK.");
+                display.WriteRolling("!ACK_UNEXP");
                 continue;
             }
             d->messageToAck->remainingAcks--;
             if(d->messageToAck->remainingAcks == 0){
-                Serial.println("[Device Manager] Message fully acknowledged.");
+                display.WriteRolling("ACK OK.");
                 free(d->messageToAck);
                 d->messageToAck = nullptr;
             } else {
-                Serial.print("[Device Manager] Message acknowledged. ");
-                Serial.print(d->messageToAck->remainingAcks);
-                Serial.println(" acknowledgments remaining.");
+                display.WriteRolling("ACK ");
+                display.WriteRollingInt(d->messageToAck->remainingAcks);
+                display.WriteRolling(" REMAIN.");
             }
         }
     }
@@ -112,9 +111,8 @@ void DeviceManager::RemoveOld() {
     while (!it.Ended()){
         auto& device = it.Current();
         if(millis() - device.lastSeen > 1000){
-            Serial.print("[Device Manager] Device ");
-            Serial.print(device.address);
-            Serial.println(" lost.");
+            display.WriteRollingInt(device.address[3]);
+            display.WriteRolling("[-]");
             it.Remove();
             continue;
         }
@@ -127,20 +125,20 @@ void DeviceManager::SendToAll(Message *msg) {
     while (!it.Ended()){
         auto& device = it.Current();
         if(!udp.beginPacket(device.address, 9887)){
-            Serial.println("[Device Manager] Warning: Failed to begin message UDP packet.");
+            display.WriteRolling("!UDP_MSG_BEGIN_ERR");
             it.Next();
             continue;
         }
         udp.write(PACKET_MSG);
         udp.write(msg->message, msg->len);
         if(!udp.endPacket()){
-            Serial.println("[Device Manager] Warning: Failed to end message UDP packet.");
+            display.WriteRolling("!UDP_MSG_END_ERR");
             it.Next();
             continue;
         }
         msg->remainingAcks++;
         if(device.messageToAck != nullptr){
-            Serial.println("[Device Manager] Skipping acknowledgement check of previous message.");
+            display.WriteRolling("!ACK_SKIP");
             device.messageToAck->remainingAcks--;
             if(device.messageToAck->remainingAcks == 0){
                 free(device.messageToAck);
