@@ -5,7 +5,7 @@
 ICACHE_RAM_ATTR const char** Keyboard::map = new const char*[16]{
     "~", "abc", "def", "~",
     "ghi", "jkl", "mno", "~",
-    "pqrs", "tuv", "wxyz", "~",
+    "pqrs", "tuv", "wxyz", ";",
     ".?!", " ", "~", "#"
 };
 template<class T, int S>

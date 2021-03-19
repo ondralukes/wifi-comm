@@ -7,10 +7,11 @@ class Display {
 public:
     Display();
     void Clear();
-    void ShowLoading(const char* msg);
+    void WriteStatus(const char* msg);
     void Update();
     void WriteRolling(const char* msg);
     void WriteRollingInt(int x);
+    void WriteRollingHex(int x);
     void WriteBottom(char c);
     void ReplaceBottom(char c);
     void ClearBottom();

@@ -6,8 +6,11 @@
 
 struct Message;
 struct Device{
-    explicit Device(const IPAddress& ip);
+    Device(uint32_t id, const IPAddress &ip);
     Message* messageToAck = nullptr;
+    uint32_t id;
+    uint8_t lastPacketId = 255;
+    bool upstream;
     IPAddress address;
     unsigned long lastSeen;
 };
@@ -37,11 +40,15 @@ public:
     void Update();
     DeviceIterator Iterator();
     void SendToAll(Message* msg);
+
+    int upstreamDevices = 0;
+    int downstreamDevices = 0;
 private:
     WiFiUDP udp;
     Display&display;
     unsigned long lastAnnounce = 0;
     DeviceListNode* list = nullptr;
+    uint8_t lastSentId = 0;
 
     void Announce();
     void HandleIncoming();

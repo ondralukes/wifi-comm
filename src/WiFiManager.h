@@ -3,17 +3,21 @@
 
 #include "Display.h"
 
-enum WiFiStatus{
-    Station,
-    AP
-};
-
 class WiFiManager {
 public:
-    static void CheckConnection(Display &lcd);
-    static WiFiStatus Status();
+    static void Init();
+    static void CheckConnection();
+    static bool Connected();
+    static uint32_t HostId();
+    static bool upstreamEnabled;
 private:
-    static bool isAP;
+    enum State{
+        Scanning,
+        Connecting,
+        Idle
+    };
+    static State state;
+    static uint32_t host;
 };
 
 

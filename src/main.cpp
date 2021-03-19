@@ -16,12 +16,19 @@ void setup() {
     // Convert RX to GPIO
     pinMode(D9, FUNCTION_3);
     WiFi.mode(WIFI_OFF);
+    lcd.WriteRolling(REVISION);
+    WiFiManager::Init();
 }
 
 void loop() {
     static bool inMessage = false;
     int pk = keyboard.Peek();
     if(pk != -1){
+        if(!inMessage){
+            MessageBuilder::BeginMessage();
+            lcd.ClearBottom();
+            inMessage = true;
+        }
         lcd.ReplaceBottom(pk);
     }
     int rd = keyboard.Read();
@@ -32,16 +39,47 @@ void loop() {
                 lcd.ClearBottom();
                 inMessage = false;
             }
+        } else if(rd == ';'){
+            WiFiManager::upstreamEnabled = !WiFiManager::upstreamEnabled;
         } else {
             lcd.WriteBottom(rd);
-            if(!inMessage) {
-                MessageBuilder::BeginMessage();
-                inMessage = true;
-            }
             MessageBuilder::Write(rd);
         }
     }
-    WiFiManager::CheckConnection(lcd);
+
+    static bool prevInMessage = true;
+    if(!inMessage){
+        static bool prevConnected = false;
+        static int prevUpstream = 0;
+        static int prevDownstream = 0;
+        static bool prevUpstreamEnabled = true;
+        bool connected = WiFiManager::Connected();
+        if(
+                prevInMessage ||
+                connected != prevConnected ||
+                prevUpstream != deviceManager.upstreamDevices ||
+                prevDownstream != deviceManager.downstreamDevices ||
+                prevUpstreamEnabled != WiFiManager::upstreamEnabled){
+            char status[17];
+            if(connected){
+                snprintf(status, 17, "UP%02d@%06x DN%02d", deviceManager.upstreamDevices, WiFiManager::HostId(), deviceManager.downstreamDevices);
+            } else {
+                if(WiFiManager::upstreamEnabled){
+                    snprintf(status, 17, "UP   N/C    DN%02d", deviceManager.downstreamDevices);
+                } else {
+                    snprintf(status, 17, "UP   OFF    DN%02d", deviceManager.downstreamDevices);
+                }
+            }
+
+            lcd.WriteStatus(status);
+            prevConnected = connected;
+            prevUpstream = deviceManager.upstreamDevices;
+            prevDownstream = deviceManager.downstreamDevices;
+            prevUpstreamEnabled = WiFiManager::upstreamEnabled;
+        }
+    }
+    prevInMessage = inMessage;
     lcd.Update();
     deviceManager.Update();
+    WiFiManager::CheckConnection();
 }

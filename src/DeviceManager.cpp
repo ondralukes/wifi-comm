@@ -1,7 +1,9 @@
 #include <Arduino.h>
+#include <ESP8266WiFi.h>
 #include "DeviceManager.h"
 #include "MessageBuilder.h"
 #include "global.h"
+#include "WiFiManager.h"
 
 void DeviceIterator::Next() {
     current = &(*current)->next;
@@ -48,11 +50,25 @@ void DeviceManager::Update() {
 void DeviceManager::Announce() {
     if(millis() - lastAnnounce < 250) return;
     lastAnnounce = millis();
-    const static IPAddress broadcast(192,168,1,255);
-    if(!udp.beginPacket(broadcast, 9887))
+    uint32_t chipId = ESP.getChipId();
+    if(WiFi.status() == WL_CONNECTED) {
+        IPAddress broadcast = WiFi.gatewayIP();
+        broadcast[3] = 255;
+        if (!udp.beginPacket(broadcast, 9887))
+            display.WriteRolling("!UDP_ANN_BEGIN_ERR");
+        udp.write(reinterpret_cast<const char *>(&chipId), sizeof(uint32_t));
+        udp.write(lastSentId);
+        if (!udp.endPacket())
+            display.WriteRolling("!UDP_ANN_END_ERR");
+    }
+
+    IPAddress broadcast = WiFi.softAPIP();
+    broadcast[3] = 255;
+    if (!udp.beginPacket(broadcast, 9887))
         display.WriteRolling("!UDP_ANN_BEGIN_ERR");
-    udp.write('a');
-    if(!udp.endPacket())
+    udp.write(reinterpret_cast<const char *>(&chipId), sizeof(uint32_t));
+    udp.write(lastSentId++);
+    if (!udp.endPacket())
         display.WriteRolling("!UDP_ANN_END_ERR");
 }
 
@@ -61,47 +77,108 @@ void DeviceManager::HandleIncoming() {
     while (udp.parsePacket() != 0){
         auto ip = udp.remoteIP();
         int size = udp.read(buffer, 4096);
+        if(size < sizeof(uint32_t)+1) continue;
+        uint32_t id = *reinterpret_cast<uint32_t *>(&buffer);
+        uint32_t myId = ESP.getChipId();
+        if(id == myId) continue;
+        // Drop all non-ACK packets from host's station interface
+        if(WiFiManager::Connected() && id == WiFiManager::HostId() && ip != WiFi.gatewayIP()){
+            if(size < sizeof(uint32_t)*2+2 || buffer[sizeof(uint32_t)+1] != PACKET_ACK) {
+                continue;
+            }
+        }
         Device* d;
         auto it = Iterator();
         while (!it.Ended()){
             auto& device = it.Current();
-            if(device.address == ip){
+            if(device.id == id){
                 device.lastSeen = millis();
+                // Keep host as upstream device
+                if(device.address != ip && ( ip==WiFi.gatewayIP() || id!=WiFiManager::HostId() || !WiFiManager::Connected())){
+                    if(device.upstream){
+                        upstreamDevices--;
+                    } else {
+                        downstreamDevices--;
+                    }
+                    if(ip == WiFi.gatewayIP() && WiFiManager::Connected()){
+                        upstreamDevices++;
+                    } else {
+                        downstreamDevices++;
+                    }
+                    device.address = ip;
+                }
                 d = &device;
                 break;
             }
             it.Next();
         }
         if(it.Ended()) {
-            display.WriteRollingInt(ip[3]);
+            display.WriteRolling(" ");
+            display.WriteRollingHex(id);
             display.WriteRolling("[+]");
-            it.Insert(Device(ip));
+            Device newDevice(id, ip);
+            it.Insert(newDevice);
+            if(newDevice.upstream){
+                upstreamDevices++;
+            } else {
+                downstreamDevices++;
+            }
             d = &it.Current();
         }
-        if(size == 0) continue;
-        if(buffer[0] == PACKET_MSG){
-            display.WriteRollingInt(ip[3]);
+
+        uint8_t packetId = buffer[sizeof(uint32_t)];
+        if(d->lastPacketId >= packetId && d->lastPacketId < 250){
+            continue;
+        }
+        d->lastPacketId = packetId;
+
+        bool forward = true;
+
+        if(size >= sizeof(uint32_t)+2 && buffer[sizeof(uint32_t)+1] == PACKET_MSG){
+            display.WriteRolling(" ");
+            display.WriteRollingHex(id);
             display.WriteRolling(">");
             buffer[size] = '\0';
-            display.WriteRolling(&buffer[1]);
-            udp.beginPacket(ip, 9887);
+            display.WriteRolling(&buffer[sizeof(uint32_t)+2]);
+
+            // Send ACK
+            udp.beginPacket(d->address, 9887);
+            udp.write(reinterpret_cast<const char *>(&myId), sizeof(uint32_t));
+            udp.write(lastSentId++);
             udp.write(PACKET_ACK);
+            udp.write(reinterpret_cast<const char *>(&d->id), sizeof(uint32_t));
             udp.endPacket();
-        } else if(buffer[0] == PACKET_ACK){
-            if(d->messageToAck == nullptr){
-                display.WriteRolling("!ACK_UNEXP");
-                continue;
+        } else if(size >= sizeof(uint32_t)*2+2 && buffer[sizeof(uint32_t)+1] == PACKET_ACK){
+            uint32_t targetId = *reinterpret_cast<uint32_t *>(&buffer[sizeof(uint32_t) + 2]);
+            if(targetId == myId) {
+                if (d->messageToAck == nullptr) {
+                    display.WriteRolling("!ACK_UNEXP");
+                    continue;
+                }
+                d->messageToAck->remainingAcks--;
+                if (d->messageToAck->remainingAcks == 0) {
+                    display.WriteRolling("ACK OK.");
+                    free(d->messageToAck);
+                    d->messageToAck = nullptr;
+                } else {
+                    display.WriteRolling("ACK ");
+                    display.WriteRollingInt(d->messageToAck->remainingAcks);
+                    display.WriteRolling(" REMAIN.");
+                }
+                forward = false;
             }
-            d->messageToAck->remainingAcks--;
-            if(d->messageToAck->remainingAcks == 0){
-                display.WriteRolling("ACK OK.");
-                free(d->messageToAck);
-                d->messageToAck = nullptr;
-            } else {
-                display.WriteRolling("ACK ");
-                display.WriteRollingInt(d->messageToAck->remainingAcks);
-                display.WriteRolling(" REMAIN.");
-            }
+        }
+        if(!forward || WiFi.status() != WL_CONNECTED) continue;
+        if(ip != WiFi.gatewayIP()) {
+            udp.beginPacket(WiFi.gatewayIP(), 9887);
+            udp.write(buffer, size);
+            udp.endPacket();
+        } else {
+            IPAddress broadcast = WiFi.softAPIP();
+            broadcast[3] = 255;
+            udp.beginPacket(broadcast, 9887);
+            udp.write(buffer, size);
+            udp.endPacket();
         }
     }
 }
@@ -111,8 +188,14 @@ void DeviceManager::RemoveOld() {
     while (!it.Ended()){
         auto& device = it.Current();
         if(millis() - device.lastSeen > 1000){
-            display.WriteRollingInt(device.address[3]);
+            display.WriteRolling(" ");
+            display.WriteRollingHex(device.id);
             display.WriteRolling("[-]");
+            if(device.upstream){
+                upstreamDevices--;
+            } else {
+                downstreamDevices--;
+            }
             it.Remove();
             continue;
         }
@@ -121,21 +204,39 @@ void DeviceManager::RemoveOld() {
 }
 
 void DeviceManager::SendToAll(Message *msg) {
+    uint32_t id = ESP.getChipId();
+    if(WiFi.status() == WL_CONNECTED) {
+        IPAddress broadcast = WiFi.gatewayIP();
+        broadcast[3] = 255;
+        if (!udp.beginPacket(broadcast, 9887)) {
+            display.WriteRolling("!UP_MSG_BEGIN_ERR");
+            return;
+        }
+        udp.write(reinterpret_cast<const char *>(&id), sizeof(uint32_t));
+        udp.write(lastSentId);
+        udp.write(PACKET_MSG);
+        udp.write(msg->message, msg->len);
+        if (!udp.endPacket()) {
+            display.WriteRolling("!UP_MSG_END_ERR");
+        }
+    }
+
+    IPAddress broadcast = WiFi.softAPIP();
+    broadcast[3] = 255;
+    if (!udp.beginPacket(broadcast, 9887)) {
+        display.WriteRolling("!DOWN_MSG_BEGIN_ERR");
+        return;
+    }
+    udp.write(reinterpret_cast<const char *>(&id), sizeof(uint32_t));
+    udp.write(lastSentId++);
+    udp.write(PACKET_MSG);
+    udp.write(msg->message, msg->len);
+    if (!udp.endPacket()) {
+        display.WriteRolling("!DOWN_MSG_END_ERR");
+    }
     auto it = Iterator();
     while (!it.Ended()){
         auto& device = it.Current();
-        if(!udp.beginPacket(device.address, 9887)){
-            display.WriteRolling("!UDP_MSG_BEGIN_ERR");
-            it.Next();
-            continue;
-        }
-        udp.write(PACKET_MSG);
-        udp.write(msg->message, msg->len);
-        if(!udp.endPacket()){
-            display.WriteRolling("!UDP_MSG_END_ERR");
-            it.Next();
-            continue;
-        }
         msg->remainingAcks++;
         if(device.messageToAck != nullptr){
             display.WriteRolling("!ACK_SKIP");
@@ -149,6 +250,7 @@ void DeviceManager::SendToAll(Message *msg) {
     }
 }
 
-Device::Device(const IPAddress& ip): address(ip) {
+Device::Device(uint32_t id, const IPAddress &ip) :  id(id), address(ip) {
     lastSeen = millis();
+    upstream = address == WiFi.gatewayIP();
 }

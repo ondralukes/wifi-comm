@@ -8,10 +8,8 @@ Display::Display() : lcd(0x27, 16, 2){
     memset(buffer, (int)' ', 16);
 }
 
-void Display::ShowLoading(const char* msg) {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print(REVISION);
+void Display::WriteStatus(const char* msg) {
+    ClearBottom();
     lcd.setCursor(0, 1);
     lcd.print(msg);
 }
@@ -68,4 +66,10 @@ void Display::Clear() {
     start = 0;
     end = 16;
     ClearBottom();
+}
+
+void Display::WriteRollingHex(int x) {
+    char buf[64];
+    itoa(x, buf, 16);
+    WriteRolling(buf);
 }
