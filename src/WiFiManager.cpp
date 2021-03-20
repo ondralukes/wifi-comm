@@ -21,12 +21,12 @@ void WiFiManager::CheckConnection() {
         status = Disabled;
         return;
     }
-    if(status == Connecting) return;
-    if(wifiStatus == WL_CONNECT_FAILED || status == Disabled){
+    if(wifiStatus == WL_CONNECT_FAILED || status == Disabled || status == Connected){
         WiFi.scanNetworks(true);
         status = Scanning;
         return;
     }
+    if(status == Connecting) return;
     int8_t n = WiFi.scanComplete();
     // Still running
     if(n == -1) return;
@@ -45,6 +45,8 @@ void WiFiManager::CheckConnection() {
         WiFi.begin(targetSSID, password);
         host = strtol(targetSSID.c_str()+11, nullptr, 16);
         status = Connecting;
+    } else {
+        WiFi.scanNetworks(true);
     }
 }
 
