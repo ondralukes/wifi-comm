@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include "Display.h"
-#include "global.h"
 
 Display::Display() : lcd(0x27, 16, 2){
     lcd.init();
@@ -15,7 +14,7 @@ void Display::WriteStatus(const char* msg) {
 }
 
 void Display::Update() {
-    if(millis() - lastUpdate < 500) return;
+    if(millis() - lastUpdate < 250) return;
     lastUpdate = millis();
     if(start == (end-16)%2048) return;
     start++;

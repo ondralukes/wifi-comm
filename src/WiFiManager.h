@@ -5,18 +5,19 @@
 
 class WiFiManager {
 public:
+    enum Status{
+        Scanning,
+        Connecting,
+        Disabled,
+        Connected
+    };
     static void Init();
     static void CheckConnection();
-    static bool Connected();
+    static enum Status Status();
     static uint32_t HostId();
     static bool upstreamEnabled;
 private:
-    enum State{
-        Scanning,
-        Connecting,
-        Idle
-    };
-    static State state;
+    static enum Status status;
     static uint32_t host;
 };
 

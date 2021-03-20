@@ -1,30 +1,30 @@
 #include <ESP8266WiFi.h>
 #include "WiFiManager.h"
 #include "global.h"
-#include "Display.h"
 
 const char* password = "12345678";
 
-WiFiManager::State WiFiManager::state = Idle;
+enum WiFiManager::Status WiFiManager::status = Disabled;
 bool WiFiManager::upstreamEnabled = true;
 uint32_t WiFiManager::host;
 void WiFiManager::CheckConnection() {
-    int status = WiFi.status();
-    if(status == WL_CONNECTED || (status == WL_IDLE_STATUS && state == Connecting)){
+    int wifiStatus = WiFi.status();
+    if(wifiStatus == WL_CONNECTED || (wifiStatus == WL_IDLE_STATUS && status == Connecting)){
         if(!upstreamEnabled){
             WiFi.disconnect();
-            state = Idle;
+            status = Disabled;
         }
+        status = Connected;
         return;
     }
-    if(!upstreamEnabled) return;
-    if(status == WL_CONNECT_FAILED){
-        state = Idle;
+    if(!upstreamEnabled){
+        status = Disabled;
+        return;
     }
-    if(state == Connecting) return;
-    if(state == Idle){
+    if(status == Connecting) return;
+    if(wifiStatus == WL_CONNECT_FAILED || status == Disabled){
         WiFi.scanNetworks(true);
-        state = Scanning;
+        status = Scanning;
         return;
     }
     int8_t n = WiFi.scanComplete();
@@ -44,7 +44,7 @@ void WiFiManager::CheckConnection() {
     if(bestRSSI != -1000) {
         WiFi.begin(targetSSID, password);
         host = strtol(targetSSID.c_str()+11, nullptr, 16);
-        state = Connecting;
+        status = Connecting;
     }
 }
 
@@ -77,8 +77,8 @@ void WiFiManager::Init() {
     }
 }
 
-bool WiFiManager::Connected() {
-    return WiFi.status() == WL_CONNECTED;
+enum WiFiManager::Status WiFiManager::Status() {
+    return status;
 }
 
 uint32_t WiFiManager::HostId() {

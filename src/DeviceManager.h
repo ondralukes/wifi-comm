@@ -16,7 +16,7 @@ struct Device{
 };
 
 struct DeviceListNode{
-    DeviceListNode(Device d, DeviceListNode* next)
+    DeviceListNode(Device &d, DeviceListNode* next)
         :d(d), next(next){}
     Device d;
     DeviceListNode* next;
@@ -29,7 +29,7 @@ public:
     bool Ended();
 private:
     explicit DeviceIterator(DeviceListNode **_insert);
-    void Insert(Device d);
+    void Insert(Device &d);
     void Remove();
     DeviceListNode** current;
     friend class DeviceManager;
@@ -43,6 +43,7 @@ public:
 
     int upstreamDevices = 0;
     int downstreamDevices = 0;
+    int acksRemaining = 0;
 private:
     WiFiUDP udp;
     Display&display;

@@ -21,7 +21,7 @@ bool DeviceIterator::Ended() {
     return *current == nullptr;
 }
 
-void DeviceIterator::Insert(Device d) {
+void DeviceIterator::Insert(Device &d) {
     auto afterNew = *current;
     *current = new DeviceListNode(d, afterNew);
 }
@@ -55,21 +55,21 @@ void DeviceManager::Announce() {
         IPAddress broadcast = WiFi.gatewayIP();
         broadcast[3] = 255;
         if (!udp.beginPacket(broadcast, 9887))
-            display.WriteRolling("!UDP_ANN_BEGIN_ERR");
+            display.WriteRolling("!0");
         udp.write(reinterpret_cast<const char *>(&chipId), sizeof(uint32_t));
         udp.write(lastSentId);
         if (!udp.endPacket())
-            display.WriteRolling("!UDP_ANN_END_ERR");
+            display.WriteRolling("!1");
     }
 
     IPAddress broadcast = WiFi.softAPIP();
     broadcast[3] = 255;
     if (!udp.beginPacket(broadcast, 9887))
-        display.WriteRolling("!UDP_ANN_BEGIN_ERR");
+        display.WriteRolling("!2");
     udp.write(reinterpret_cast<const char *>(&chipId), sizeof(uint32_t));
     udp.write(lastSentId++);
     if (!udp.endPacket())
-        display.WriteRolling("!UDP_ANN_END_ERR");
+        display.WriteRolling("!3");
 }
 
 void DeviceManager::HandleIncoming() {
@@ -82,7 +82,7 @@ void DeviceManager::HandleIncoming() {
         uint32_t myId = ESP.getChipId();
         if(id == myId) continue;
         // Drop all non-ACK packets from host's station interface
-        if(WiFiManager::Connected() && id == WiFiManager::HostId() && ip != WiFi.gatewayIP()){
+        if(WiFiManager::Status() == WiFiManager::Connected && id == WiFiManager::HostId() && ip != WiFi.gatewayIP()){
             if(size < sizeof(uint32_t)*2+2 || buffer[sizeof(uint32_t)+1] != PACKET_ACK) {
                 continue;
             }
@@ -94,16 +94,22 @@ void DeviceManager::HandleIncoming() {
             if(device.id == id){
                 device.lastSeen = millis();
                 // Keep host as upstream device
-                if(device.address != ip && ( ip==WiFi.gatewayIP() || id!=WiFiManager::HostId() || !WiFiManager::Connected())){
+                if(
+                        device.address != ip && (
+                                ip==WiFi.gatewayIP() ||
+                                id!=WiFiManager::HostId() ||
+                                WiFiManager::Status() != WiFiManager::Connected)){
                     if(device.upstream){
                         upstreamDevices--;
                     } else {
                         downstreamDevices--;
                     }
-                    if(ip == WiFi.gatewayIP() && WiFiManager::Connected()){
+                    if(ip == WiFi.gatewayIP() && WiFiManager::Status() == WiFiManager::Connected){
                         upstreamDevices++;
+                        device.upstream = true;
                     } else {
                         downstreamDevices++;
+                        device.upstream = false;
                     }
                     device.address = ip;
                 }
@@ -113,9 +119,6 @@ void DeviceManager::HandleIncoming() {
             it.Next();
         }
         if(it.Ended()) {
-            display.WriteRolling(" ");
-            display.WriteRollingHex(id);
-            display.WriteRolling("[+]");
             Device newDevice(id, ip);
             it.Insert(newDevice);
             if(newDevice.upstream){
@@ -152,18 +155,14 @@ void DeviceManager::HandleIncoming() {
             uint32_t targetId = *reinterpret_cast<uint32_t *>(&buffer[sizeof(uint32_t) + 2]);
             if(targetId == myId) {
                 if (d->messageToAck == nullptr) {
-                    display.WriteRolling("!ACK_UNEXP");
+                    display.WriteRolling("!4");
                     continue;
                 }
                 d->messageToAck->remainingAcks--;
+                acksRemaining--;
                 if (d->messageToAck->remainingAcks == 0) {
-                    display.WriteRolling("ACK OK.");
                     free(d->messageToAck);
                     d->messageToAck = nullptr;
-                } else {
-                    display.WriteRolling("ACK ");
-                    display.WriteRollingInt(d->messageToAck->remainingAcks);
-                    display.WriteRolling(" REMAIN.");
                 }
                 forward = false;
             }
@@ -188,9 +187,6 @@ void DeviceManager::RemoveOld() {
     while (!it.Ended()){
         auto& device = it.Current();
         if(millis() - device.lastSeen > 1000){
-            display.WriteRolling(" ");
-            display.WriteRollingHex(device.id);
-            display.WriteRolling("[-]");
             if(device.upstream){
                 upstreamDevices--;
             } else {
@@ -209,7 +205,7 @@ void DeviceManager::SendToAll(Message *msg) {
         IPAddress broadcast = WiFi.gatewayIP();
         broadcast[3] = 255;
         if (!udp.beginPacket(broadcast, 9887)) {
-            display.WriteRolling("!UP_MSG_BEGIN_ERR");
+            display.WriteRolling("!5");
             return;
         }
         udp.write(reinterpret_cast<const char *>(&id), sizeof(uint32_t));
@@ -217,14 +213,14 @@ void DeviceManager::SendToAll(Message *msg) {
         udp.write(PACKET_MSG);
         udp.write(msg->message, msg->len);
         if (!udp.endPacket()) {
-            display.WriteRolling("!UP_MSG_END_ERR");
+            display.WriteRolling("!6");
         }
     }
 
     IPAddress broadcast = WiFi.softAPIP();
     broadcast[3] = 255;
     if (!udp.beginPacket(broadcast, 9887)) {
-        display.WriteRolling("!DOWN_MSG_BEGIN_ERR");
+        display.WriteRolling("!7");
         return;
     }
     udp.write(reinterpret_cast<const char *>(&id), sizeof(uint32_t));
@@ -232,15 +228,17 @@ void DeviceManager::SendToAll(Message *msg) {
     udp.write(PACKET_MSG);
     udp.write(msg->message, msg->len);
     if (!udp.endPacket()) {
-        display.WriteRolling("!DOWN_MSG_END_ERR");
+        display.WriteRolling("!8");
     }
     auto it = Iterator();
     while (!it.Ended()){
         auto& device = it.Current();
         msg->remainingAcks++;
+        acksRemaining++;
         if(device.messageToAck != nullptr){
-            display.WriteRolling("!ACK_SKIP");
+            display.WriteRolling("!9");
             device.messageToAck->remainingAcks--;
+            acksRemaining--;
             if(device.messageToAck->remainingAcks == 0){
                 free(device.messageToAck);
             }
@@ -252,5 +250,5 @@ void DeviceManager::SendToAll(Message *msg) {
 
 Device::Device(uint32_t id, const IPAddress &ip) :  id(id), address(ip) {
     lastSeen = millis();
-    upstream = address == WiFi.gatewayIP();
+    upstream = address == WiFi.gatewayIP() && WiFiManager::Status() == WiFiManager::Connected;
 }

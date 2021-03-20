@@ -4,7 +4,6 @@
 #include "WiFiManager.h"
 #include "MessageBuilder.h"
 #include "Keyboard.h"
-#include "Display.h"
 
 Display lcd;
 DeviceManager deviceManager(lcd);
@@ -49,33 +48,48 @@ void loop() {
 
     static bool prevInMessage = true;
     if(!inMessage){
-        static bool prevConnected = false;
+        static enum WiFiManager::Status prevStatus;
         static int prevUpstream = 0;
         static int prevDownstream = 0;
+        static int prevAcksRemaining = 0;
         static bool prevUpstreamEnabled = true;
-        bool connected = WiFiManager::Connected();
+        enum WiFiManager::Status status = WiFiManager::Status();
         if(
                 prevInMessage ||
-                connected != prevConnected ||
+                status != prevStatus ||
                 prevUpstream != deviceManager.upstreamDevices ||
                 prevDownstream != deviceManager.downstreamDevices ||
-                prevUpstreamEnabled != WiFiManager::upstreamEnabled){
-            char status[17];
-            if(connected){
-                snprintf(status, 17, "UP%02d@%06x DN%02d", deviceManager.upstreamDevices, WiFiManager::HostId(), deviceManager.downstreamDevices);
+                prevUpstreamEnabled != WiFiManager::upstreamEnabled ||
+                prevAcksRemaining != deviceManager.acksRemaining){
+            char text[17];
+            if(deviceManager.acksRemaining != 0){
+                snprintf(text, 17, "%d ACKs", deviceManager.acksRemaining);
+            } else if(status == WiFiManager::Connected){
+                snprintf(text, 17, "UP%02d@%06x DN%02d", deviceManager.upstreamDevices, WiFiManager::HostId(), deviceManager.downstreamDevices);
             } else {
-                if(WiFiManager::upstreamEnabled){
-                    snprintf(status, 17, "UP   N/C    DN%02d", deviceManager.downstreamDevices);
-                } else {
-                    snprintf(status, 17, "UP   OFF    DN%02d", deviceManager.downstreamDevices);
+                const char* statusText;
+                switch (status) {
+                    case WiFiManager::Disabled:
+                        statusText = "OFF ";
+                        break;
+                    case WiFiManager::Scanning:
+                        statusText = "SCAN";
+                        break;
+                    case WiFiManager::Connecting:
+                        statusText = "CONN";
+                        break;
+                    default:
+                        break;
                 }
+                snprintf(text, 17, "UP   %s   DN%02d", statusText, deviceManager.downstreamDevices);
             }
 
-            lcd.WriteStatus(status);
-            prevConnected = connected;
+            lcd.WriteStatus(text);
+            prevStatus = status;
             prevUpstream = deviceManager.upstreamDevices;
             prevDownstream = deviceManager.downstreamDevices;
             prevUpstreamEnabled = WiFiManager::upstreamEnabled;
+            prevAcksRemaining = deviceManager.acksRemaining;
         }
     }
     prevInMessage = inMessage;
