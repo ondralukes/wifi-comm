@@ -162,8 +162,8 @@ void DeviceManager::HandleIncoming() {
                 acksRemaining--;
                 if (d->messageToAck->remainingAcks == 0) {
                     free(d->messageToAck);
-                    d->messageToAck = nullptr;
                 }
+                d->messageToAck = nullptr;
                 forward = false;
             }
         }
