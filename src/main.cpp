@@ -21,6 +21,7 @@ void setup() {
 
 void loop() {
     static bool inMessage = false;
+    static unsigned long forceShowAckStart = -1;
     int pk = keyboard.Peek();
     if(pk != -1){
         if(!inMessage){
@@ -36,6 +37,7 @@ void loop() {
             if(inMessage) {
                 MessageBuilder::SendMessage(deviceManager);
                 lcd.ClearBottom();
+                forceShowAckStart = millis();
                 inMessage = false;
             }
         } else if(rd == ';'){
@@ -60,12 +62,15 @@ void loop() {
                 prevUpstream != deviceManager.upstreamDevices ||
                 prevDownstream != deviceManager.downstreamDevices ||
                 prevUpstreamEnabled != WiFiManager::upstreamEnabled ||
-                prevAcksRemaining != deviceManager.acksRemaining){
+                prevAcksRemaining != deviceManager.acksRemaining ||
+                        (forceShowAckStart != -1 &&(millis() - forceShowAckStart) >= 1000)){
             char text[17];
-            if(deviceManager.acksRemaining != 0){
-                snprintf(text, 17, "%d ACKs", deviceManager.acksRemaining);
+            if(deviceManager.acksRemaining != 0 ||  (forceShowAckStart != -1 && millis() - forceShowAckStart < 1000)){
+                snprintf(text, 17, "Sent to %d/%d", (deviceManager.acks - deviceManager.acksRemaining), deviceManager.acks);
+                if(deviceManager.acksRemaining != 0) forceShowAckStart = millis();
             } else if(status == WiFiManager::Connected){
                 snprintf(text, 17, "UP%02d@%06x DN%02d", deviceManager.upstreamDevices, WiFiManager::HostId(), deviceManager.downstreamDevices);
+                forceShowAckStart = -1;
             } else {
                 const char* statusText;
                 switch (status) {
@@ -82,6 +87,7 @@ void loop() {
                         break;
                 }
                 snprintf(text, 17, "UP   %s   DN%02d", statusText, deviceManager.downstreamDevices);
+                forceShowAckStart = -1;
             }
 
             lcd.WriteStatus(text);

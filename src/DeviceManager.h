@@ -44,6 +44,7 @@ public:
     int upstreamDevices = 0;
     int downstreamDevices = 0;
     int acksRemaining = 0;
+    int acks = 0;
 private:
     WiFiUDP udp;
     Display&display;

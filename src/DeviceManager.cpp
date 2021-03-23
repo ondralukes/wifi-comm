@@ -246,6 +246,7 @@ void DeviceManager::SendToAll(Message *msg) {
         device.messageToAck = msg;
         it.Next();
     }
+    acks = acksRemaining;
 }
 
 Device::Device(uint32_t id, const IPAddress &ip) :  id(id), address(ip) {
