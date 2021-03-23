@@ -92,13 +92,8 @@ void DeviceManager::HandleIncoming() {
         while (!it.Ended()){
             auto& device = it.Current();
             if(device.id == id){
-                device.lastSeen = millis();
-                // Keep host as upstream device
-                if(
-                        device.address != ip && (
-                                ip==WiFi.gatewayIP() ||
-                                id!=WiFiManager::HostId() ||
-                                WiFiManager::Status() != WiFiManager::Connected)){
+                // Switch IP addresses only after 300 ms to avoid rapid IP switching
+                if(device.address != ip && (millis() - device.lastSeen) > 625){
                     if(device.upstream){
                         upstreamDevices--;
                     } else {
@@ -113,6 +108,7 @@ void DeviceManager::HandleIncoming() {
                     }
                     device.address = ip;
                 }
+                device.lastSeen = millis();
                 d = &device;
                 break;
             }
