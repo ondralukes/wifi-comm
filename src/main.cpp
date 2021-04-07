@@ -8,12 +8,16 @@
 Display lcd;
 DeviceManager deviceManager(lcd);
 
-const uint8_t rowPins [4] = {D4, D9, D3, D5};
-const uint8_t colsPins [4] = {D0, D6, D7, D8};
+const uint8_t rowPins [4] = {D7, D8, D6, D5};
+// Column with pin 255 is used as fallback
+const uint8_t colsPins [4] = {D0, D4, D3, 255};
 Keyboard keyboard(rowPins, 4, colsPins, 4);
 void setup() {
     // Convert RX to GPIO
     pinMode(D9, FUNCTION_3);
+    pinMode(D9, OUTPUT);
+    pinMode(D7, INPUT);
+    digitalWrite(D9, LOW);
     WiFi.mode(WIFI_OFF);
     lcd.WriteRolling(REVISION);
     WiFiManager::Init();
@@ -21,6 +25,7 @@ void setup() {
 
 void loop() {
     static bool inMessage = false;
+    static unsigned long shuttingDownStart = -1;
     static unsigned long forceShowAckStart = -1;
     int pk = keyboard.Peek();
     if(pk != -1){
@@ -42,6 +47,8 @@ void loop() {
             }
         } else if(rd == ';'){
             WiFiManager::upstreamEnabled = !WiFiManager::upstreamEnabled;
+        } else if(rd == '^'){
+            shuttingDownStart = shuttingDownStart==-1?millis():-1;
         } else {
             lcd.WriteBottom(rd);
             MessageBuilder::Write(rd);
@@ -49,12 +56,13 @@ void loop() {
     }
 
     static bool prevInMessage = true;
-    if(!inMessage){
+    if(!inMessage || shuttingDownStart != -1){
         static enum WiFiManager::Status prevStatus;
         static int prevUpstream = 0;
         static int prevDownstream = 0;
         static int prevAcksRemaining = 0;
         static bool prevUpstreamEnabled = true;
+        static unsigned long prevShuttingDown = -1;
         enum WiFiManager::Status status = WiFiManager::Status();
         if(
                 prevInMessage ||
@@ -63,9 +71,12 @@ void loop() {
                 prevDownstream != deviceManager.downstreamDevices ||
                 prevUpstreamEnabled != WiFiManager::upstreamEnabled ||
                 prevAcksRemaining != deviceManager.acksRemaining ||
+                prevShuttingDown != shuttingDownStart ||
                         (forceShowAckStart != -1 &&(millis() - forceShowAckStart) >= 1000)){
             char text[17];
-            if(deviceManager.acksRemaining != 0 ||  (forceShowAckStart != -1 && millis() - forceShowAckStart < 1000)){
+            if(shuttingDownStart != -1){
+                snprintf(text, 17, "Shutting down...");
+            } else if(deviceManager.acksRemaining != 0 ||  (forceShowAckStart != -1 && millis() - forceShowAckStart < 1000)){
                 snprintf(text, 17, "Sent to %d/%d", (deviceManager.acks - deviceManager.acksRemaining), deviceManager.acks);
                 if(deviceManager.acksRemaining != 0) forceShowAckStart = millis();
             } else if(status == WiFiManager::Connected){
@@ -96,10 +107,14 @@ void loop() {
             prevDownstream = deviceManager.downstreamDevices;
             prevUpstreamEnabled = WiFiManager::upstreamEnabled;
             prevAcksRemaining = deviceManager.acksRemaining;
+            prevShuttingDown = shuttingDownStart;
         }
     }
     prevInMessage = inMessage;
     lcd.Update();
     deviceManager.Update();
     WiFiManager::CheckConnection();
+    if(shuttingDownStart != -1 && millis() - shuttingDownStart > 3000){
+        digitalWrite(D9, HIGH);
+    }
 }

@@ -3,10 +3,10 @@
 #include "Keyboard.h"
 
 ICACHE_RAM_ATTR const char** Keyboard::map = new const char*[16]{
-    "~", "abc", "def", "~",
-    "ghi", "jkl", "mno", "~",
-    "pqrs", "tuv", "wxyz", ";",
-    ".?!", " ", "~", "#"
+    "1", "abc2", "def3", "^",
+    "ghi4", "jkl5", "mno6", "~",
+    "pqrs7", "tuv8", "wxyz9", ";",
+    ".?!", " 0", "~", "#"
 };
 template<class T, int S>
 T *Keyboard::Queue<T, S>::Dequeue() {
@@ -44,14 +44,15 @@ Keyboard::Keyboard(const uint8_t *rowPins, int rows, const uint8_t* colPins, int
 
     interruptArgs = new InterruptArg[rows];
     for(int i = 0;i<rows;i++){
-        pinMode(rowPins[i], INPUT_PULLUP);
+        pinMode(rowPins[i], INPUT);
         interruptArgs[i].data = isrData;
         interruptArgs[i].row = i;
-        attachInterruptArg(rowPins[i], reinterpret_cast<void (*)(void *)>(ISR), &interruptArgs[i], FALLING);
+        attachInterruptArg(rowPins[i], reinterpret_cast<void (*)(void *)>(ISR), &interruptArgs[i], RISING);
     }
     for(int i = 0;i<cols;i++){
+        if(colPins[i] == 255) continue;
         pinMode(colPins[i], OUTPUT);
-        digitalWrite(colPins[i], LOW);
+        digitalWrite(colPins[i], HIGH);
     }
     previousHit.pos = 0xff;
 }
@@ -63,15 +64,21 @@ void ICACHE_RAM_ATTR  Keyboard::ISR(InterruptArg *arg) {
 
     int r = arg->row;
     int c = -1;
+    int fallback = -1;
     for(int i = 0; i< data->cols;i++){
-        digitalWrite(data->cPins[i], HIGH);
-        if(digitalRead(data->rPins[r]) == HIGH){
-            c = i;
-            digitalWrite(data->cPins[i], LOW);
-            break;
+        if(data->cPins[i] == 255){
+            fallback = i;
+            continue;
         }
         digitalWrite(data->cPins[i], LOW);
+        if(digitalRead(data->rPins[r]) == LOW){
+            c = i;
+            digitalWrite(data->cPins[i], HIGH);
+            break;
+        }
+        digitalWrite(data->cPins[i], HIGH);
     }
+    if(c == -1) c = fallback;
     if(c == -1) return;
     auto * ev = data->hits.ItemToEnqueue();
     ev->time = millis();

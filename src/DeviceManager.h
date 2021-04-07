@@ -36,7 +36,7 @@ private:
 };
 class DeviceManager {
 public:
-    DeviceManager(Display &display);
+    explicit DeviceManager(Display &display);
     void Update();
     DeviceIterator Iterator();
     void SendToAll(Message* msg);
