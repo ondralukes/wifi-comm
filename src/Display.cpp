@@ -61,6 +61,11 @@ void Display::ClearBottom() {
     bottomPosition = 0;
 }
 
+void Display::DeleteBottom() {
+    lcd.setCursor(--bottomPosition, 1);
+    lcd.write(' ');
+}
+
 void Display::Clear() {
     lcd.clear();
     memset(buffer, (int)' ', 16);

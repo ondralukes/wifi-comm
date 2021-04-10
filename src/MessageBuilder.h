@@ -11,6 +11,7 @@ class MessageBuilder {
 public:
     static void BeginMessage();
     static void Write(char c);
+    static bool Delete();
     static void SendMessage(DeviceManager&deviceManager);
 private:
     static char buffer[4096];

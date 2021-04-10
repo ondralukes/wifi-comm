@@ -17,3 +17,11 @@ void MessageBuilder::SendMessage(DeviceManager &deviceManager) {
     memcpy(msg->message, buffer, len);
     deviceManager.SendToAll(msg);
 }
+
+bool MessageBuilder::Delete() {
+    len--;
+    if(len <= 0){
+        len = 0;
+    }
+    return len != 0;
+}

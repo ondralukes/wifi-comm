@@ -35,6 +35,7 @@ public:
     void WriteRollingHex(int x);
     void WriteBottom(char c);
     void ReplaceBottom(char c);
+    void DeleteBottom();
     void ClearBottom();
     bool NeedsUpdate(DeviceManager &deviceManager, unsigned long _shuttingDown, bool _inMessage,
     unsigned long _forceShowAckStart);

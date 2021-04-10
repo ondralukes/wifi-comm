@@ -49,7 +49,15 @@ void loop() {
             WiFiManager::upstreamEnabled = !WiFiManager::upstreamEnabled;
         } else if(rd == '^'){
             shuttingDownStart = shuttingDownStart==-1?millis():-1;
+        } else if (rd == '<'){
+            if(inMessage) lcd.DeleteBottom();
+            inMessage = MessageBuilder::Delete();
         } else {
+            if(!inMessage){
+                MessageBuilder::BeginMessage();
+                lcd.ClearBottom();
+                inMessage = true;
+            }
             lcd.WriteBottom(rd);
             MessageBuilder::Write(rd);
         }

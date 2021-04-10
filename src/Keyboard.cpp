@@ -4,7 +4,7 @@
 
 ICACHE_RAM_ATTR const char** Keyboard::map = new const char*[16]{
     "1", "abc2", "def3", "^",
-    "ghi4", "jkl5", "mno6", "~",
+    "ghi4", "jkl5", "mno6", "<",
     "pqrs7", "tuv8", "wxyz9", ";",
     ".?!", " 0", "~", "#"
 };
