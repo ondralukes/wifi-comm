@@ -1,8 +1,6 @@
 #ifndef WIFI_COMM_WIFIMANAGER_H
 #define WIFI_COMM_WIFIMANAGER_H
 
-#include "Display.h"
-
 class WiFiManager {
 public:
     enum Status{

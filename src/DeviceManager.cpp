@@ -44,6 +44,7 @@ DeviceManager::DeviceManager(Display &display) : display(display){
 void DeviceManager::Update() {
     Announce();
     HandleIncoming();
+    RetryFailed();
     RemoveOld();
 }
 
@@ -240,9 +241,36 @@ void DeviceManager::SendToAll(Message *msg) {
             }
         }
         device.messageToAck = msg;
+        device.lastAttemptTime = millis();
         it.Next();
     }
+    attempts = 1;
     acks = acksRemaining;
+}
+
+void DeviceManager::RetryFailed() {
+    unsigned long time = millis();
+    uint32_t id = ESP.getChipId();
+    auto it = Iterator();
+    while (!it.Ended()) {
+        auto& device = it.Current();
+        if(device.messageToAck != nullptr && time-device.lastAttemptTime > 250){
+            if (!udp.beginPacket(device.address, 9887)) {
+                display.WriteRolling("!a");
+                return;
+            }
+            udp.write(reinterpret_cast<const char *>(&id), sizeof(uint32_t));
+            udp.write(lastSentId++);
+            udp.write(PACKET_MSG);
+            udp.write(device.messageToAck->message, device.messageToAck->len);
+            if (!udp.endPacket()) {
+                display.WriteRolling("!b");
+            }
+            device.lastAttemptTime = time;
+            attempts++;
+        }
+        it.Next();
+    }
 }
 
 Device::Device(uint32_t id, const IPAddress &ip) :  id(id), address(ip) {

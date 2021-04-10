@@ -2,6 +2,27 @@
 #define WIFI_COMM_DISPLAY_H
 
 #include <LiquidCrystal_I2C.h>
+#include "WiFiManager.h"
+
+class DeviceManager;
+class DisplayState{
+public:
+    bool NeedsUpdate(DeviceManager &deviceManager, unsigned long _shuttingDown, bool _inMessage,
+                     unsigned long _forceShowAckStart);
+
+private:
+    enum WiFiManager::Status status;
+    int upstream = 0;
+    int downstream = 0;
+    int acksRemaining = 0;
+    int attempts = 0;
+    bool upstreamEnabled = true;
+    unsigned long shuttingDown = -1;
+    bool inMessage;
+
+    template<class T>
+    bool CheckAndAssign(T* dest, T value);
+};
 
 class Display {
 public:
@@ -15,8 +36,11 @@ public:
     void WriteBottom(char c);
     void ReplaceBottom(char c);
     void ClearBottom();
+    bool NeedsUpdate(DeviceManager &deviceManager, unsigned long _shuttingDown, bool _inMessage,
+    unsigned long _forceShowAckStart);
 private:
     LiquidCrystal_I2C lcd;
+    DisplayState state;
     char buffer[2048];
     int start = 0;
     int end = 16;

@@ -8,6 +8,7 @@ struct Message;
 struct Device{
     Device(uint32_t id, const IPAddress &ip);
     Message* messageToAck = nullptr;
+    unsigned long lastAttemptTime;
     uint32_t id;
     uint8_t lastPacketId = 255;
     bool upstream;
@@ -40,11 +41,13 @@ public:
     void Update();
     DeviceIterator Iterator();
     void SendToAll(Message* msg);
+    void RetryFailed();
 
     int upstreamDevices = 0;
     int downstreamDevices = 0;
     int acksRemaining = 0;
     int acks = 0;
+    int attempts = 0;
 private:
     WiFiUDP udp;
     Display&display;

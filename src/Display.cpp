@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include "Display.h"
+#include "WiFiManager.h"
+#include "DeviceManager.h"
 
 Display::Display() : lcd(0x27, 16, 2){
     lcd.init();
@@ -71,4 +73,36 @@ void Display::WriteRollingHex(int x) {
     char buf[64];
     itoa(x, buf, 16);
     WriteRolling(buf);
+}
+
+bool Display::NeedsUpdate(DeviceManager &deviceManager, unsigned long _shuttingDown, bool _inMessage,
+                          unsigned long _forceShowAckStart) {
+    return state.NeedsUpdate(deviceManager, _shuttingDown, _inMessage, _forceShowAckStart);
+}
+
+template<class T>
+bool DisplayState::CheckAndAssign(T *dest, T value) {
+    bool r = *dest != value;
+    *dest = value;
+    return r;
+}
+
+bool DisplayState::NeedsUpdate(DeviceManager &deviceManager, unsigned long _shuttingDown, bool _inMessage,
+                               unsigned long _forceShowAckStart) {
+    bool r = false;
+    r |= CheckAndAssign(&status, WiFiManager::Status());
+    r |= CheckAndAssign(&upstream, deviceManager.upstreamDevices);
+    r |= CheckAndAssign(&downstream, deviceManager.downstreamDevices);
+    r |= CheckAndAssign(&acksRemaining, deviceManager.acksRemaining);
+    r |= CheckAndAssign(&attempts,deviceManager.attempts);
+    r |= CheckAndAssign(&upstreamEnabled, WiFiManager::upstreamEnabled);
+    r |= CheckAndAssign(&shuttingDown, _shuttingDown);
+    if(inMessage) r = true;
+    if(_inMessage && shuttingDown == -1){
+        r = false;
+    } else if((_forceShowAckStart != -1 &&(millis() - _forceShowAckStart) >= 1000)){
+        r = true;
+    }
+    inMessage = _inMessage;
+    return r;
 }

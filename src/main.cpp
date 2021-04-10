@@ -55,62 +55,38 @@ void loop() {
         }
     }
 
-    static bool prevInMessage = true;
-    if(!inMessage || shuttingDownStart != -1){
-        static enum WiFiManager::Status prevStatus;
-        static int prevUpstream = 0;
-        static int prevDownstream = 0;
-        static int prevAcksRemaining = 0;
-        static bool prevUpstreamEnabled = true;
-        static unsigned long prevShuttingDown = -1;
+    if(lcd.NeedsUpdate(deviceManager, shuttingDownStart, inMessage, forceShowAckStart)){
         enum WiFiManager::Status status = WiFiManager::Status();
-        if(
-                prevInMessage ||
-                status != prevStatus ||
-                prevUpstream != deviceManager.upstreamDevices ||
-                prevDownstream != deviceManager.downstreamDevices ||
-                prevUpstreamEnabled != WiFiManager::upstreamEnabled ||
-                prevAcksRemaining != deviceManager.acksRemaining ||
-                prevShuttingDown != shuttingDownStart ||
-                        (forceShowAckStart != -1 &&(millis() - forceShowAckStart) >= 1000)){
-            char text[17];
-            if(shuttingDownStart != -1){
-                snprintf(text, 17, "Shutting down...");
-            } else if(deviceManager.acksRemaining != 0 ||  (forceShowAckStart != -1 && millis() - forceShowAckStart < 1000)){
-                snprintf(text, 17, "Sent to %d/%d", (deviceManager.acks - deviceManager.acksRemaining), deviceManager.acks);
-                if(deviceManager.acksRemaining != 0) forceShowAckStart = millis();
-            } else if(status == WiFiManager::Connected){
-                snprintf(text, 17, "UP%02d@%06x DN%02d", deviceManager.upstreamDevices, WiFiManager::HostId(), deviceManager.downstreamDevices);
-                forceShowAckStart = -1;
-            } else {
-                const char* statusText;
-                switch (status) {
-                    case WiFiManager::Disabled:
-                        statusText = "OFF ";
-                        break;
-                    case WiFiManager::Scanning:
-                        statusText = "SCAN";
-                        break;
-                    case WiFiManager::Connecting:
-                        statusText = "CONN";
-                        break;
-                    default:
-                        break;
-                }
-                snprintf(text, 17, "UP   %s   DN%02d", statusText, deviceManager.downstreamDevices);
-                forceShowAckStart = -1;
+        char text[17];
+        if(shuttingDownStart != -1){
+            snprintf(text, 17, "Shutting down...");
+        } else if(deviceManager.acksRemaining != 0 ||  (forceShowAckStart != -1 && millis() - forceShowAckStart < 1000)){
+            snprintf(text, 17, "Sent to %d/%d A%d", (deviceManager.acks - deviceManager.acksRemaining), deviceManager.acks, deviceManager.attempts);
+            if(deviceManager.acksRemaining != 0) forceShowAckStart = millis();
+        } else if(status == WiFiManager::Connected){
+            snprintf(text, 17, "UP%02d@%06x DN%02d", deviceManager.upstreamDevices, WiFiManager::HostId(), deviceManager.downstreamDevices);
+            forceShowAckStart = -1;
+        } else {
+            const char* statusText;
+            switch (status) {
+                case WiFiManager::Disabled:
+                    statusText = "OFF ";
+                    break;
+                case WiFiManager::Scanning:
+                    statusText = "SCAN";
+                    break;
+                case WiFiManager::Connecting:
+                    statusText = "CONN";
+                    break;
+                default:
+                    break;
             }
-
-            lcd.WriteStatus(text);
-            prevStatus = status;
-            prevUpstream = deviceManager.upstreamDevices;
-            prevDownstream = deviceManager.downstreamDevices;
-            prevUpstreamEnabled = WiFiManager::upstreamEnabled;
-            prevAcksRemaining = deviceManager.acksRemaining;
-            prevShuttingDown = shuttingDownStart;
+            snprintf(text, 17, "UP   %s   DN%02d", statusText, deviceManager.downstreamDevices);
+            forceShowAckStart = -1;
         }
+
+        lcd.WriteStatus(text);
     }
-    prevInMessage = inMessage;
     lcd.Update();
     deviceManager.Update();
     WiFiManager::CheckConnection();
