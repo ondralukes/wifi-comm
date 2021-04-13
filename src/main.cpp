@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include <EEPROM.h>
 #include "DeviceManager.h"
 #include "WiFiManager.h"
 #include "MessageBuilder.h"
@@ -19,8 +20,72 @@ void setup() {
     pinMode(D7, INPUT);
     digitalWrite(D9, LOW);
     WiFi.mode(WIFI_OFF);
-    lcd.WriteRolling(REVISION);
+    lcd.WriteLine("wifi-comm", 0);
+    lcd.WriteLine(REVISION);
+    delay(1000);
+    EEPROM.begin(512);
+    char magicByte = EEPROM.read(0);
+    char name[128];
+    lcd.Clear();
+    if(magicByte != 0x69){
+        snprintf(name, 128, "u%06x", ESP.getChipId());
+    } else {
+        int index = 1;
+        char* c = name;
+        while((*(c++) = EEPROM[index]) != '\0')
+            index++;
+    }
+
+    lcd.WriteLine("Name", 0);
+    lcd.WriteLine(name, 1);
+
+    unsigned long start = millis();
+    bool changed = false;
+    char* insertAt = name;
+    while(changed || millis() - start < 2000){
+        ESP.wdtFeed();
+        int pk = keyboard.Peek();
+        if(pk != -1){
+            if(!changed){
+                lcd.ClearLine();
+                changed = true;
+            }
+            lcd.ReplaceBottom(pk);
+        }
+        int rd = keyboard.Read();
+        if(rd != -1){
+            if(rd == '#'){
+                *insertAt = '\0';
+                break;
+            } else if (rd == '<'){
+                if(changed && insertAt != name){
+                    lcd.DeleteBottom();
+                    insertAt--;
+                }
+            } else {
+                if(!changed){
+                    lcd.ClearLine();
+                    changed = true;
+                }
+                lcd.WriteBottom(rd);
+                *(insertAt++) = rd;
+            }
+        }
+    }
+
+    if(magicByte != 0x69)
+        EEPROM.write(0, 0x69);
+    const char* c = name;
+    int addr = 1;
+    do {
+        EEPROM.write(addr++, *c);
+    } while (*(c++) != '\0');
+    EEPROM.commit();
+
+    lcd.Clear();
     WiFiManager::Init();
+    deviceManager.SetName(name);
+    lcd.WriteRolling(name);
 }
 
 void loop() {
@@ -31,7 +96,7 @@ void loop() {
     if(pk != -1){
         if(!inMessage){
             MessageBuilder::BeginMessage();
-            lcd.ClearBottom();
+            lcd.ClearLine();
             inMessage = true;
         }
         lcd.ReplaceBottom(pk);
@@ -41,7 +106,7 @@ void loop() {
         if(rd == '#'){
             if(inMessage) {
                 MessageBuilder::SendMessage(deviceManager);
-                lcd.ClearBottom();
+                lcd.ClearLine();
                 forceShowAckStart = millis();
                 inMessage = false;
             }
@@ -55,7 +120,7 @@ void loop() {
         } else {
             if(!inMessage){
                 MessageBuilder::BeginMessage();
-                lcd.ClearBottom();
+                lcd.ClearLine();
                 inMessage = true;
             }
             lcd.WriteBottom(rd);
@@ -93,7 +158,7 @@ void loop() {
             forceShowAckStart = -1;
         }
 
-        lcd.WriteStatus(text);
+        lcd.WriteLine(text);
     }
     lcd.Update();
     deviceManager.Update();

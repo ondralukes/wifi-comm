@@ -9,9 +9,9 @@ Display::Display() : lcd(0x27, 16, 2){
     memset(buffer, (int)' ', 16);
 }
 
-void Display::WriteStatus(const char* msg) {
-    ClearBottom();
-    lcd.setCursor(0, 1);
+void Display::WriteLine(const char *msg, int line) {
+    ClearLine(line);
+    lcd.setCursor(0, line);
     lcd.print(msg);
 }
 
@@ -55,8 +55,8 @@ void Display::ReplaceBottom(char c) {
     lcd.write(c);
 }
 
-void Display::ClearBottom() {
-    lcd.setCursor(0, 1);
+void Display::ClearLine(int line) {
+    lcd.setCursor(0, line);
     lcd.print("                ");
     bottomPosition = 0;
 }
@@ -71,7 +71,7 @@ void Display::Clear() {
     memset(buffer, (int)' ', 16);
     start = 0;
     end = 16;
-    ClearBottom();
+    ClearLine();
 }
 
 void Display::WriteRollingHex(int x) {

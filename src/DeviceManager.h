@@ -14,6 +14,7 @@ struct Device{
     bool upstream;
     IPAddress address;
     unsigned long lastSeen;
+    char name[64];
 };
 
 struct DeviceListNode{
@@ -41,7 +42,7 @@ public:
     void Update();
     DeviceIterator Iterator();
     void SendToAll(Message* msg);
-    void RetryFailed();
+    void SetName(const char* n);
 
     int upstreamDevices = 0;
     int downstreamDevices = 0;
@@ -51,6 +52,7 @@ public:
 private:
     WiFiUDP udp;
     Display&display;
+    char name[128];
     unsigned long lastAnnounce = 0;
     DeviceListNode* list = nullptr;
     uint8_t lastSentId = 0;
@@ -58,6 +60,7 @@ private:
     void Announce();
     void HandleIncoming();
     void RemoveOld();
+    void RetryFailed();
 };
 
 

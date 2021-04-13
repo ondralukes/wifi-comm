@@ -5,6 +5,7 @@
     #define REVISION "unknown"
 #endif
 
+#define PACKET_ANN 0
 #define PACKET_MSG 1
 #define PACKET_ACK 2
 

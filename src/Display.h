@@ -28,7 +28,7 @@ class Display {
 public:
     Display();
     void Clear();
-    void WriteStatus(const char* msg);
+    void WriteLine(const char *msg, int line = 1);
     void Update();
     void WriteRolling(const char* msg);
     void WriteRollingInt(int x);
@@ -36,7 +36,7 @@ public:
     void WriteBottom(char c);
     void ReplaceBottom(char c);
     void DeleteBottom();
-    void ClearBottom();
+    void ClearLine(int line = 1);
     bool NeedsUpdate(DeviceManager &deviceManager, unsigned long _shuttingDown, bool _inMessage,
     unsigned long _forceShowAckStart);
 private:

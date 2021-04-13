@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include <cstring>
 #include "DeviceManager.h"
 #include "MessageBuilder.h"
 #include "global.h"
@@ -59,6 +60,8 @@ void DeviceManager::Announce() {
             display.WriteRolling("!0");
         udp.write(reinterpret_cast<const char *>(&chipId), sizeof(uint32_t));
         udp.write(lastSentId);
+        udp.write(PACKET_ANN);
+        udp.write(name);
         if (!udp.endPacket())
             display.WriteRolling("!1");
     }
@@ -69,6 +72,8 @@ void DeviceManager::Announce() {
         display.WriteRolling("!2");
     udp.write(reinterpret_cast<const char *>(&chipId), sizeof(uint32_t));
     udp.write(lastSentId++);
+    udp.write(PACKET_ANN);
+    udp.write(name);
     if (!udp.endPacket())
         display.WriteRolling("!3");
 }
@@ -136,7 +141,7 @@ void DeviceManager::HandleIncoming() {
 
         if(size >= sizeof(uint32_t)+2 && buffer[sizeof(uint32_t)+1] == PACKET_MSG){
             display.WriteRolling(" ");
-            display.WriteRollingHex(id);
+            display.WriteRolling(d->name);
             display.WriteRolling(">");
             buffer[size] = '\0';
             display.WriteRolling(&buffer[sizeof(uint32_t)+2]);
@@ -163,6 +168,9 @@ void DeviceManager::HandleIncoming() {
                 d->messageToAck = nullptr;
                 forward = false;
             }
+        } else if(size >= sizeof(uint32_t)+3 && buffer[sizeof(uint32_t)+1] == PACKET_ANN){
+            buffer[size] = '\0';
+            strcpy(d->name, &buffer[sizeof(uint32_t)+2]);
         }
         if(!forward || WiFi.status() != WL_CONNECTED) continue;
         if(ip != WiFi.gatewayIP()) {
@@ -273,7 +281,12 @@ void DeviceManager::RetryFailed() {
     }
 }
 
+void DeviceManager::SetName(const char * n) {
+    strcpy(name, n);
+}
+
 Device::Device(uint32_t id, const IPAddress &ip) :  id(id), address(ip) {
     lastSeen = millis();
     upstream = address == WiFi.gatewayIP() && WiFiManager::Status() == WiFiManager::Connected;
+    strcpy(name, "???");
 }
