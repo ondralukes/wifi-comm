@@ -3,6 +3,7 @@
 
 #include <LiquidCrystal_I2C.h>
 #include "WiFiManager.h"
+#include "Keyboard.h"
 
 class DeviceManager;
 class DisplayState{
@@ -37,6 +38,7 @@ public:
     void ReplaceBottom(char c);
     void DeleteBottom();
     void ClearLine(int line = 1);
+    void Prompt(Keyboard &keyboard, const char *msg, char *buf);
     bool NeedsUpdate(DeviceManager &deviceManager, unsigned long _shuttingDown, bool _inMessage,
     unsigned long _forceShowAckStart);
 private:

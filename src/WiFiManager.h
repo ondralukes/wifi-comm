@@ -1,6 +1,7 @@
 #ifndef WIFI_COMM_WIFIMANAGER_H
 #define WIFI_COMM_WIFIMANAGER_H
 
+class Display;
 class WiFiManager {
 public:
     enum Status{
@@ -9,7 +10,7 @@ public:
         Disabled,
         Connected
     };
-    static void Init();
+    static void Init(const char *networkCode);
     static void CheckConnection();
     static enum Status Status();
     static uint32_t HostId();
@@ -17,6 +18,8 @@ public:
 private:
     static enum Status status;
     static uint32_t host;
+    static char prefix[128];
+    static char password[128];
 };
 
 

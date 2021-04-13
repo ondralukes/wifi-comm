@@ -2,6 +2,7 @@
 #include "Display.h"
 #include "WiFiManager.h"
 #include "DeviceManager.h"
+#include "Keyboard.h"
 
 Display::Display() : lcd(0x27, 16, 2){
     lcd.init();
@@ -83,6 +84,46 @@ void Display::WriteRollingHex(int x) {
 bool Display::NeedsUpdate(DeviceManager &deviceManager, unsigned long _shuttingDown, bool _inMessage,
                           unsigned long _forceShowAckStart) {
     return state.NeedsUpdate(deviceManager, _shuttingDown, _inMessage, _forceShowAckStart);
+}
+
+void Display::Prompt(Keyboard &keyboard, const char *msg, char *buf) {
+    WriteLine(msg, 0);
+    WriteLine(buf, 1);
+
+    bool changed = false;
+    char* insertAt = buf;
+    unsigned long startTime = millis();
+    while(changed || millis() - startTime < 2000){
+        ESP.wdtFeed();
+        int pk = keyboard.Peek();
+        if(pk != -1){
+            if(!changed){
+                ClearLine();
+                changed = true;
+            }
+            ReplaceBottom(pk);
+        }
+        int rd = keyboard.Read();
+        if(rd != -1){
+            if(rd == '#'){
+                *insertAt = '\0';
+                break;
+            } else if (rd == '<'){
+                if(changed && insertAt != buf){
+                    DeleteBottom();
+                    insertAt--;
+                }
+            } else {
+                if(!changed){
+                    ClearLine();
+                    changed = true;
+                }
+                WriteBottom(rd);
+                *(insertAt++) = rd;
+            }
+        }
+    }
+    Clear();
 }
 
 template<class T>

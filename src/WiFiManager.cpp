@@ -1,11 +1,14 @@
 #include <ESP8266WiFi.h>
+#include <Hash.h>
 #include "WiFiManager.h"
 #include "global.h"
-
-const char* password = "12345678";
+#include "Display.h"
 
 enum WiFiManager::Status WiFiManager::status = Disabled;
 bool WiFiManager::upstreamEnabled = true;
+char WiFiManager::prefix[128];
+char WiFiManager::password[128];
+
 uint32_t WiFiManager::host;
 void WiFiManager::CheckConnection() {
     int wifiStatus = WiFi.status();
@@ -36,21 +39,31 @@ void WiFiManager::CheckConnection() {
     for(int i = 0;i<n;i++){
         auto scannedSSID = WiFi.SSID(i);
         auto rssi = WiFi.RSSI(i);
-        if(scannedSSID.startsWith("_wifi_comm_") && rssi > bestRSSI){
+        if(scannedSSID.startsWith(prefix) && rssi > bestRSSI){
             bestRSSI = rssi;
             targetSSID = scannedSSID;
         }
     }
     if(bestRSSI != -1000) {
         WiFi.begin(targetSSID, password);
-        host = strtol(targetSSID.c_str()+11, nullptr, 16);
+        host = strtol(targetSSID.c_str()+16, nullptr, 16);
         status = Connecting;
     } else {
         WiFi.scanNetworks(true);
     }
 }
 
-void WiFiManager::Init() {
+void WiFiManager::Init(const char *networkCode) {
+    strcpy(password, networkCode);
+    if(strlen(password) < 8)
+        strcat(password, "pwd-padd");
+    uint8_t hash[20];
+    sha1(password, strlen(password), hash);
+    char* ptr = prefix;
+    for(int i = 0;i<8;i++){
+        ptr += sprintf(ptr, "%02x", hash[i]);
+    }
+
     WiFi.mode(WIFI_AP_STA);
     uint32_t chipId = ESP.getChipId();
     uint8_t ip1 = chipId&0xffu;
@@ -73,7 +86,7 @@ void WiFiManager::Init() {
         throw_error("Failed to configure AP.");
     }
     char ssid[64];
-    snprintf(ssid, 64, "_wifi_comm_%x", chipId);
+    snprintf(ssid, 64, "%s%x", prefix, chipId);
     if(!WiFi.softAP(ssid, password)){
         throw_error("Failed to start AP.");
     }

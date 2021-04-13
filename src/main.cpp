@@ -25,67 +25,34 @@ void setup() {
     delay(1000);
     EEPROM.begin(512);
     char magicByte = EEPROM.read(0);
-    char name[128];
+    char buf[128];
     lcd.Clear();
     if(magicByte != 0x69){
-        snprintf(name, 128, "u%06x", ESP.getChipId());
+        snprintf(buf, 128, "u%06x", ESP.getChipId());
     } else {
         int index = 1;
-        char* c = name;
+        char* c = buf;
         while((*(c++) = EEPROM[index]) != '\0')
             index++;
     }
 
-    lcd.WriteLine("Name", 0);
-    lcd.WriteLine(name, 1);
-
-    unsigned long start = millis();
-    bool changed = false;
-    char* insertAt = name;
-    while(changed || millis() - start < 2000){
-        ESP.wdtFeed();
-        int pk = keyboard.Peek();
-        if(pk != -1){
-            if(!changed){
-                lcd.ClearLine();
-                changed = true;
-            }
-            lcd.ReplaceBottom(pk);
-        }
-        int rd = keyboard.Read();
-        if(rd != -1){
-            if(rd == '#'){
-                *insertAt = '\0';
-                break;
-            } else if (rd == '<'){
-                if(changed && insertAt != name){
-                    lcd.DeleteBottom();
-                    insertAt--;
-                }
-            } else {
-                if(!changed){
-                    lcd.ClearLine();
-                    changed = true;
-                }
-                lcd.WriteBottom(rd);
-                *(insertAt++) = rd;
-            }
-        }
-    }
+    lcd.Prompt(keyboard, "Name", buf);
 
     if(magicByte != 0x69)
         EEPROM.write(0, 0x69);
-    const char* c = name;
+    const char* c = buf;
     int addr = 1;
     do {
         EEPROM.write(addr++, *c);
     } while (*(c++) != '\0');
     EEPROM.commit();
+    deviceManager.SetName(buf);
 
-    lcd.Clear();
-    WiFiManager::Init();
-    deviceManager.SetName(name);
-    lcd.WriteRolling(name);
+    strcpy(buf, "default");
+
+    lcd.Prompt(keyboard, "Network code", buf);
+    lcd.WriteLine("Initializing");
+    WiFiManager::Init(buf);
 }
 
 void loop() {
