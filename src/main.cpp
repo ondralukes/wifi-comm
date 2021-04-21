@@ -131,6 +131,6 @@ void loop() {
     deviceManager.Update();
     WiFiManager::CheckConnection();
     if(shuttingDownStart != -1 && millis() - shuttingDownStart > 3000){
-        digitalWrite(D9, HIGH);
+        pinMode(D9, INPUT);
     }
 }
