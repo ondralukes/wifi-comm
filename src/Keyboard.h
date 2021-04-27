@@ -3,46 +3,61 @@
 
 class Keyboard {
 public:
-    Keyboard(const uint8_t * rowPins, int rows, const uint8_t* colPins, int cols);
+    Keyboard(const uint8_t *rowPins, int rows, const uint8_t *colPins, int cols);
+
     int Peek();
+
     int Read();
+
+    void DiscardAll();
+
 private:
     template<class T, int S>
-    class Queue{
+    class Queue {
     public:
-        T* Dequeue();
-        T* ItemToEnqueue();
+        T *Dequeue();
+
+        T *ItemToEnqueue();
+
         void Enqueue();
+
         void Enqueue(T item);
+
+        void Clear();
+
     private:
         T items[S];
         int enqueue = 0;
         int dequeue = 0;
     };
-    struct Hit{
+
+    struct Hit {
         uint8_t pos;
         unsigned long time;
     };
-    struct ISRAccessedData{
+    struct ISRAccessedData {
         Queue<Hit, 256> hits;
         volatile unsigned long lastPress = 0;
-        uint8_t * rPins;
+        uint8_t *rPins;
         int rows;
-        uint8_t * cPins;
+        uint8_t *cPins;
         int cols;
     };
-    struct InterruptArg{
+    struct InterruptArg {
         uint8_t row;
-        ISRAccessedData* data;
+        ISRAccessedData *data;
     };
+
     static void ISR(InterruptArg *arg);
-    ISRAccessedData * isrData;
-    InterruptArg * interruptArgs;
+
+    ISRAccessedData *isrData;
+    InterruptArg *interruptArgs;
     Hit previousHit;
     int currentOption;
 
-    static const char** map;
+    static const char **map;
     Queue<char, 32> chars;
+
     void Update();
 };
 

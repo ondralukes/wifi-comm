@@ -6,7 +6,8 @@
 #include "Keyboard.h"
 
 class DeviceManager;
-class DisplayState{
+
+class DisplayState {
 public:
     bool NeedsUpdate(DeviceManager &deviceManager, unsigned long _shuttingDown, bool _inMessage,
                      unsigned long _forceShowAckStart);
@@ -22,25 +23,38 @@ private:
     bool inMessage;
 
     template<class T>
-    bool CheckAndAssign(T* dest, T value);
+    bool CheckAndAssign(T *dest, T value);
 };
 
 class Display {
 public:
     Display();
+
     void Clear();
+
     void WriteLine(const char *msg, int line = 1);
+
     void Update();
-    void WriteRolling(const char* msg);
+
+    void WriteRolling(const char *msg);
+
     void WriteRollingInt(int x);
+
     void WriteRollingHex(int x);
+
     void WriteBottom(char c);
+
     void ReplaceBottom(char c);
+
     void DeleteBottom();
+
     void ClearLine(int line = 1);
+
     void Prompt(Keyboard &keyboard, const char *msg, char *buf);
+
     bool NeedsUpdate(DeviceManager &deviceManager, unsigned long _shuttingDown, bool _inMessage,
-    unsigned long _forceShowAckStart);
+                     unsigned long _forceShowAckStart);
+
 private:
     LiquidCrystal_I2C lcd;
     DisplayState state;

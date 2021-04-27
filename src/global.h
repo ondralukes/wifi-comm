@@ -2,13 +2,9 @@
 #define GLOBAL_H
 
 #ifndef REVISION
-    #define REVISION "unknown"
+#define REVISION "unknown"
 #endif
 
-#define PACKET_ANN 0
-#define PACKET_MSG 1
-#define PACKET_ACK 2
-
-[[noreturn]] void throw_error(const char* msg);
+[[noreturn]] void throw_error(const char *msg);
 
 #endif //GLOBAL_H
